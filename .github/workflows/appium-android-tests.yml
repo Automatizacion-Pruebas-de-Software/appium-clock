@@ -44,12 +44,12 @@ jobs:
           adb devices
           adb shell pm list packages | grep deskclock
 
-    # Paso 5: Configurar Node.js
+    # Paso 5: Configurar Node.js (CORREGIDO)
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
+        cache: ''  # Cache desactivada para evitar el error
 
     # Paso 6: Instalar Appium y dependencias
     - name: Install Appium and Python dependencies
@@ -71,9 +71,11 @@ jobs:
     - name: Wait for emulator
       run: |
         adb wait-for-device
+        echo "Waiting for device to be fully ready..."
+        sleep 30
         adb shell input keyevent 82
         echo "Emulator is ready"
-        adb shell dumpsys window | grep -E 'mCurrentFocus'
+        adb shell dumpsys window | grep -E 'mCurrentFocus' || true
 
     # Paso 9: Ejecutar suite de tests
     - name: Run Test Suite
@@ -98,3 +100,4 @@ jobs:
         if [ ! -z "$APPIUM_PID" ]; then
           kill $APPIUM_PID 2>/dev/null || true
         fi
+        echo "🧹 Cleanup completed"
