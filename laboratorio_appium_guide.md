@@ -227,6 +227,11 @@ appium
 ```bash
 python test_calculadora.py
 ```
+
+---
+
+## Paso 6: CI/CD
+
 ```bash
 ┌─────────────────────────────────────────────────────────────────┐
 │                    APPIUM + GITHUB ACTIONS FLOW                 │

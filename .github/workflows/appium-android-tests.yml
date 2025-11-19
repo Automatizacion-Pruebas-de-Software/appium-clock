@@ -1,0 +1,100 @@
+# .github/workflows/appium-android-tests.yml
+name: Appium Android Tests
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    - cron: '0 6 * * *'  # Ejecutar diariamente a las 6 AM UTC
+
+jobs:
+  appium-tests:
+    name: Run Appium Android Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    # Paso 1: Checkout del código
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # Paso 2: Configurar Java
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    # Paso 3: Configurar Android SDK
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+
+    # Paso 4: Crear y ejecutar emulador
+    - name: Run Android Emulator
+      uses: reactivecircus/android-emulator-runner@v2
+      with:
+        api-level: 34
+        arch: x86_64
+        profile: pixel_6
+        target: google_apis
+        emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+        disable-animations: false
+        script: |
+          adb devices
+          adb shell pm list packages | grep deskclock
+
+    # Paso 5: Configurar Node.js
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    # Paso 6: Instalar Appium y dependencias
+    - name: Install Appium and Python dependencies
+      run: |
+        npm install -g appium
+        appium driver install uiautomator2
+        pip install appium-python-client selenium
+
+    # Paso 7: Iniciar Appium Server
+    - name: Start Appium Server
+      run: |
+        appium --log-level info --relaxed-security --allow-insecure=adb_shell &
+        APPIUM_PID=$!
+        echo "APPIUM_PID=$APPIUM_PID" >> $GITHUB_ENV
+        sleep 10
+        echo "🚀 Appium server started"
+
+    # Paso 8: Esperar a que el emulador esté listo
+    - name: Wait for emulator
+      run: |
+        adb wait-for-device
+        adb shell input keyevent 82
+        echo "Emulator is ready"
+        adb shell dumpsys window | grep -E 'mCurrentFocus'
+
+    # Paso 9: Ejecutar suite de tests
+    - name: Run Test Suite
+      run: |
+        python run_test_suite.py
+
+    # Paso 10: Subir resultados y screenshots
+    - name: Upload Test Artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: |
+          test-reports/
+          *.png
+        retention-days: 7
+
+    # Paso 11: Limpiar proceso Appium
+    - name: Cleanup Appium
+      if: always()
+      run: |
+        if [ ! -z "$APPIUM_PID" ]; then
+          kill $APPIUM_PID 2>/dev/null || true
+        fi
